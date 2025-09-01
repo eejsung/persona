@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>페르소나 투자 웹앱</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #151a2e;
+      --muted: #9aa3b2;
+      --text: #e9edf3;
+      --brand: #3ea8ff;
+      --brand-2: #2e7dd8;
+      --danger: #ff5d5d;
+      --success: #2dd4bf;
+      --warning: #ffb020;
+      --border: rgba(255,255,255,0.08);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 700px at 70% -10%, rgba(62,168,255,.15), transparent 60%),
+                  radial-gradient(900px 600px at -10% 20%, rgba(99,102,241,.12), transparent 60%),
+                  var(--bg);
+    }
+    header { position: sticky; top: 0; z-index: 10; background: rgba(11,16,32,.7); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 20px; }
+    .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+    .muted { color: var(--muted); }
+
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.02), transparent), var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+    .list { display: grid; gap: 12px; }
+
+    .stock-item { display: grid; grid-template-columns: 1fr 140px 100px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.02); }
+    .stock-item:hover { background: rgba(255,255,255,.05); }
+    .price { font-weight: 700; text-align: right; }
+
+    .btn { border: none; padding: 10px 14px; border-radius: 999px; font-weight: 700; cursor: pointer; color: white; background: var(--brand); box-shadow: inset 0 -2px 0 rgba(0,0,0,.15); }
+    .btn:hover { background: var(--brand-2); }
+    .btn.secondary { background: #334155; }
+    .btn.secondary:hover { background: #273446; }
+    .btn.danger { background: var(--danger); }
+    .btn.danger:hover { filter: brightness(0.95); }
+    .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+    .back { display:flex; align-items:center; gap:8px; text-decoration:none; color: var(--text); }
+
+    .grid-2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    td.num, th.num { text-align: right; }
+    tr:last-child td { border-bottom: none; }
+    .status { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block; }
+    .status.open { background: rgba(62,168,255,.15); color: #bde2ff; border: 1px solid rgba(62,168,255,.3); }
+    .status.closed { background: rgba(45,212,191,.15); color: #d1faf4; border: 1px solid rgba(45,212,191,.35); }
+
+    .pill { padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--border); }
+
+    .title-lg { font-size: 28px; margin: 6px 0 2px; }
+    .sub { font-size: 13px; color: var(--muted); }
+
+    .persona-card { margin-top: 14px; }
+    .persona-header { display:flex; align-items:center; justify-content: space-between; margin-bottom: 8px; }
+
+    .totals { display:flex; gap: 12px; flex-wrap: wrap; }
+    .totals .pill { font-weight: 700; }
+
+    dialog { border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--text); padding: 0; box-shadow: var(--shadow); }
+    .dialog-head { padding: 16px 18px; border-bottom: 1px solid var(--border); font-weight: 800; }
+    .dialog-body { padding: 16px 18px; display: grid; gap: 12px; }
+    .dialog-foot { padding: 16px 18px; border-top: 1px solid var(--border); display:flex; justify-content: flex-end; gap: 10px; }
+    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+    input[type="text"], input[type="number"], input[type="date"] { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.05); color: var(--text); font-size: 15px; }
+    input[readonly] { opacity: .8; }
+
+    .icon-btn { background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; color: var(--muted); cursor: pointer; }
+    .icon-btn:hover { color: var(--text); background: rgba(255,255,255,.06); }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .rule-tip { margin: 8px 0 4px; padding: 10px 12px; border-radius: 12px; background: rgba(255,176,32,.12); border:1px solid rgba(255,176,32,.35); display:flex; align-items:center; justify-content: space-between; gap: 8px; }
+    .rule-badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; border:1px solid rgba(255,176,32,.4); background: rgba(255,176,32,.15); color: #ffd89a; font-weight: 800; }
+
+    .hit { background: rgba(46,204,113,.10); }
+
+    @keyframes pulse { 0%{ transform: scale(1);} 50%{ transform: scale(1.04);} 100%{ transform: scale(1);} }
+    .pulse { animation: pulse 1.1s infinite; }
+
+    @media (max-width: 720px){
+      .stock-item{ grid-template-columns: 1fr 110px 90px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .title-lg{ font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row" id="topbar">
+      <a class="back" id="backBtn" href="#">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>보유종목으로 돌아가기</span>
+      </a>
+      <h1 id="title" style="margin-left:auto">페르소나 투자 웹앱</h1>
+    </div>
+  </header>
+
+  <main class="wrap" id="app">
+    <!-- 렌더링 영역 -->
+  </main>
+
+  <!-- 매수 추가/수정 다이얼로그 -->
+  <dialog id="buyDialog">
+    <div class="dialog-head" id="buyDialogTitle">매수 주문 추가</div>
+    <form method="dialog" id="buyForm">
+      <div class="dialog-body">
+        <label>매수일
+          <input type="date" id="buyDate" required />
+        </label>
+        <label>매수가 (원)
+          <input type="number" id="buyPrice" step="1" min="0" required />
+        </label>
+        <label>수량 (주)
+          <input type="number" id="buyQty" step="1" min="1" required />
+        </label>
+        <label>매도목표가 (원)
+          <input type="number" id="targetPrice" step="1" min="0" />
+        </label>
+        <div class="muted" id="ruleHint"></div>
+        <label>총 매수액
+          <input type="text" id="buyTotal" readonly />
+        </label>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn secondary" value="cancel" type="button" id="buyCancel">취소</button>
+        <button class="btn" value="default" id="buySave" type="submit">추가</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 매도 다이얼로그 -->
+  <dialog id="sellDialog">
+    <div class="dialog-head" id="sellDialogTitle">매도</div>
+    <form method="dialog" id="sellForm">
+      <div class="dialog-body">
+        <label>매도일
+          <input type="date" id="sellDate" required />
+        </label>
+        <label>매도가 (원)
+          <input type="number" id="sellPrice" step="1" min="0" required />
+        </label>
+        <div class="muted" id="sellHint"></div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn secondary" value="cancel" type="button" id="sellCancel">취소</button>
+        <button class="btn danger" value="default" id="sellSave" type="submit">매도 확정</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module">
+    // ====== 설정 ======
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYbI8Tfnd9Ef0GIUQ3o4WeO8-fccOiMylsgT-Bh5zsv5iyplYpRwotlsLxzaKRuCtm-dCqs3JOmyFR/pub?gid=0&single=true&output=csv";
+    const REFRESH_MS = 30_000; // 가격 재조회 주기
+
+    // 룰(+3.1% 매도, -3.1% 재매수) 및 반올림 기본값(원 단위 5원)
+    const RULE = { up: 0.031, dn: 0.031, round: 5 };
+
+    // ====== 유틸 ======
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const fmtWon = (n) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 }).format(Math.round(n||0));
+
+    const roundUpTo = (n, step) => Math.ceil((n||0)/step)*step;
+    const roundDownTo = (n, step) => Math.floor((n||0)/step)*step;
+    const suggSell = (buyPrice) => roundUpTo(buyPrice * (1 + RULE.up), RULE.round);
+    const suggRebuy = (sellPrice) => roundDownTo(sellPrice * (1 - RULE.dn), RULE.round);
+
+    function parseCSV(text){
+      // 기대 형식: 종목명,종목코드,가격
+      const lines = text.trim().split(/?
+/);
+      const rows = [];
+      for(const line of lines){
+        const parts = line.split(',').map(s=>s.trim());
+        if(parts.length >= 3){
+          const name = parts[0];
+          const code = parts[1];
+          const price = Number(String(parts[2]).replace(/[^0-9.\-]/g,'')) || 0;
+          rows.push({ name, code, price });
+        }
+      }
+      if(rows.length && rows[0].name === '종목명'){ rows.shift(); }
+      return rows;
+    }
+
+    // ====== 로컬 스토리지 미니 DB ======
+    const dbKey = 'persona-trader.v1';
+    function loadDB(){
+      try{ return JSON.parse(localStorage.getItem(dbKey)) || { stocks:{} }; }catch{ return { stocks:{} }; }
+    }
+    function saveDB(data){ localStorage.setItem(dbKey, JSON.stringify(data)); }
+
+    // stock 구조: { personas: [ { id, name, orders: [ { id, date, price, qty, target, status: 'OPEN'|'CLOSED', sellDate?, sellPrice?, realized? } ] } ] }
+    function getStockEntry(code){
+      const db = loadDB();
+      if(!db.stocks[code]){ db.stocks[code] = { personas: [] }; saveDB(db); }
+      return db.stocks[code];
+    }
+    function upsertStockEntry(code, updater){
+      const db = loadDB();
+      const entry = db.stocks[code] || { personas: [] };
+      db.stocks[code] = updater(entry) || entry;
+      saveDB(db);
+    }
+
+    // ====== 상태 ======
+    let state = { stocks: [], selected: null };
+
+    async function fetchStocks(){
+      try{
+        const res = await fetch(CSV_URL, { cache: 'no-store' });
+        const text = await res.text();
+        state.stocks = parseCSV(text);
+      }catch(err){ console.error('가격 불러오기 실패', err); }
+      render();
+    }
+
+    function startAutoRefresh(){ fetchStocks(); setInterval(fetchStocks, REFRESH_MS); }
+
+    // ====== 라우팅 ======
+    function syncFromHash(){
+      const m = location.hash.match(/#stock\/(.+)$/);
+      if(m){
+        const code = decodeURIComponent(m[1]);
+        const found = state.stocks.find(s=>s.code===code);
+        if(found){ state.selected = found; } else { state.selected = { name:'', code, price: 0 }; }
+      } else { state.selected = null; }
+      render();
+    }
+    window.addEventListener('hashchange', syncFromHash);
+
+    // ====== 렌더 ======
+    const app = document.getElementById('app');
+    const backBtn = document.getElementById('backBtn');
+
+    function render(){
+      if(!state.selected){ renderList(); backBtn.style.visibility='hidden'; $('#title').textContent = '페르소나 투자 웹앱'; return; }
+      backBtn.style.visibility='visible'; renderDetail(state.selected);
+    }
+
+    function renderList(){
+      app.innerHTML = '';
+      const box = document.createElement('div');
+      box.className = 'card';
+      box.innerHTML = `
+        <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+          <div>
+            <div style="font-size:22px; font-weight:800;">보유종목 현황</div>
+            <div class="sub">종목별 관리 페이지로 이동하여 상세 정보를 확인하세요</div>
+          </div>
+          <button class="btn ghost" id="refreshBtn">새로고침</button>
+        </div>
+        <div class="list" id="stockList"></div>
+      `;
+      app.appendChild(box);
+
+      const list = $('#stockList', box);
+      for(const s of state.stocks){
+        const item = document.createElement('div');
+        item.className = 'stock-item';
+        item.innerHTML = `
+          <div>
+            <div style="font-weight:800; font-size:18px">${s.name}</div>
+            <div class="muted mono">KRX:${s.code}</div>
+          </div>
+          <div class="price">${fmtWon(s.price)}</div>
+          <div style="text-align:right">
+            <a class="btn" href="#stock/${encodeURIComponent(s.code)}">관리</a>
+          </div>
+        `;
+        list.appendChild(item);
+      }
+
+      $('#refreshBtn', box)?.addEventListener('click', fetchStocks);
+    }
+
+    function renderDetail(stock){
+      const { name, code } = stock;
+      $('#title').textContent = name || code;
+      app.innerHTML = '';
+
+      const head = document.createElement('div');
+      head.className = 'card';
+      head.innerHTML = `
+        <div class="row" style="justify-content: space-between; align-items: flex-end;">
+          <div>
+            <div class="muted mono">KRX:${code}</div>
+            <div class="title-lg">${name || code}</div>
+            <div class="row" style="margin-top:6px; gap:8px;">
+              <span class="pill">현재가 <b>${fmtWon(getLivePrice(code))}</b></span>
+              <button class="icon-btn" id="priceRefresh">가격 새로고침</button>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn" id="addPersona"><b>＋</b>&nbsp; 페르소나 추가</button>
+          </div>
+        </div>
+      `;
+      app.appendChild(head);
+
+      const entry = getStockEntry(code);
+      entry.personas.forEach((p, idx)=>{ app.appendChild(renderPersonaCard(stock, p, idx)); });
+
+      $('#priceRefresh', head).addEventListener('click', ()=>{ fetchStocks(); });
+      $('#addPersona', head).addEventListener('click', ()=>{
+        const nextNum = (entry.personas.length + 1);
+        const title = `${(name||code)}${nextNum}번`;
+        upsertStockEntry(code, (e)=>{ e.personas.push({ id: crypto.randomUUID(), name: title, orders: [] }); return e; });
+        renderDetail(stock);
+      });
+    }
+
+    function renderPersonaCard(stock, persona, index){
+      const live = getLivePrice(stock.code);
+      const wrap = document.createElement('div');
+      wrap.className = 'card persona-card';
+
+      const openOrders = persona.orders.filter(o=>o.status!=='CLOSED');
+      const invested = openOrders.reduce((a,o)=>a + (o.price*o.qty), 0);
+      const heldQty = openOrders.reduce((a,o)=>a + o.qty, 0);
+      const evalAmt = heldQty * live;
+      const evalPL = evalAmt - invested;
+      const realized = persona.orders.filter(o=>o.status==='CLOSED').reduce((a,o)=>a + (o.realized||0), 0);
+
+      // 룰 체크: 매도(열린 주문들), 재매수(마지막 매도)
+      const sellTriggers = openOrders.map(o=>({ oid:o.id, target:(o.target||suggSell(o.price)), hit: live >= (o.target||suggSell(o.price)) }));
+      const lastClosed = [...persona.orders].filter(o=>o.status==='CLOSED').slice(-1)[0];
+      const rebuyTarget = lastClosed ? suggRebuy(lastClosed.sellPrice) : null;
+      const rebuyHit = !!(lastClosed && live <= rebuyTarget);
+
+      wrap.innerHTML = `
+        <div class="persona-header">
+          <div class="row">
+            <div style="font-size:18px; font-weight:800;">${persona.name}</div>
+            <span class="pill">보유수량 <b>${heldQty}</b>주</span>
+            ${(sellTriggers.some(t=>t.hit) || rebuyHit) ? `<span class="rule-badge">룰 신호</span>`:''}
+          </div>
+          <div class="row">
+            <button class="btn" data-action="addBuy">＋ 매수 추가</button>
+            <button class="icon-btn" data-action="rename">수정</button>
+            <button class="icon-btn" data-action="remove">삭제</button>
+          </div>
+        </div>
+        ${rebuyHit ? `<div class="rule-tip">재매수 제안: <b>${fmtWon(rebuyTarget)}</b> (마지막 매도가의 -3.1%)<div class="row"><button class="btn" data-action="quickRebuy">한번에 추가</button></div></div>`:''}
+        <div class="totals" style="margin-bottom:8px;">
+          <span class="pill">투자금: <b>${fmtWon(invested)}</b></span>
+          <span class="pill">평가금액: <b>${fmtWon(evalAmt)}</b></span>
+          <span class="pill">평가손익: <b style="color:${evalPL>=0? 'var(--success)':'var(--danger)'}">${fmtWon(evalPL)}</b></span>
+          <span class="pill">실현손익: <b>${fmtWon(realized)}</b></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>차수</th>
+                <th>매수일</th>
+                <th class="num">매수가</th>
+                <th class="num">수량</th>
+                <th class="num">총매수액</th>
+                <th class="num">매도목표가</th>
+                <th class="num">손익</th>
+                <th>상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      `;
+
+      const tbody = $('tbody', wrap);
+      persona.orders.forEach((o, i)=>{
+        const tr = document.createElement('tr');
+        const target = (o.target || suggSell(o.price));
+        const sellHit = (o.status!=='CLOSED') && (live >= target);
+        const pnl = (o.status==='CLOSED') ? (o.realized||0) : (live - o.price) * o.qty;
+        tr.className = sellHit ? 'hit' : '';
+        tr.innerHTML = `
+          <td>${i+1}차</td>
+          <td>${o.date}</td>
+          <td class="num">${fmtWon(o.price)}</td>
+          <td class="num">${o.qty.toLocaleString('ko-KR')}</td>
+          <td class="num">${fmtWon(o.price*o.qty)}</td>
+          <td class="num">${o.target? fmtWon(o.target): `${fmtWon(target)} <span class="muted">(룰)</span>`}</td>
+          <td class="num" style="font-weight:700; color:${pnl>=0? 'var(--success)':'var(--danger)'}">${fmtWon(pnl)}</td>
+          <td>${o.status==='CLOSED' ? `<span class="status closed">매도완료</span>` : `<span class="status open">보유중</span>`}</td>
+          <td>
+            <div class="row" style="gap:6px;">
+              <button class="icon-btn" data-action="edit" data-oid="${o.id}">수정</button>
+              ${o.status==='CLOSED' ? '' : `<button class="btn danger ${sellHit? 'pulse':''}" data-action="sell" data-oid="${o.id}">매도</button>`}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      wrap.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button');
+        if(!btn) return;
+        const act = btn.getAttribute('data-action');
+        if(act==='addBuy') openBuyDialog('add', stock, persona);
+        if(act==='rename') renamePersona(stock, persona);
+        if(act==='remove') removePersona(stock, persona);
+        if(act==='edit'){
+          const oid = btn.getAttribute('data-oid');
+          const order = persona.orders.find(x=>x.id===oid); if(order) openBuyDialog('edit', stock, persona, order);
+        }
+        if(act==='sell'){
+          const oid = btn.getAttribute('data-oid');
+          const order = persona.orders.find(x=>x.id===oid); if(order) openSellDialog(stock, persona, order);
+        }
+        if(act==='quickRebuy' && lastClosed){
+          const defQty = lastClosed.qty || 1;
+          openBuyDialog('add', stock, persona, null, {
+            price: Math.round(live),
+            qty: defQty,
+            target: suggSell(Math.round(live))
+          });
+        }
+      });
+
+      return wrap;
+    }
+
+    function renamePersona(stock, persona){
+      const name = prompt('페르소나 이름을 입력하세요', persona.name);
+      if(!name) return;
+      upsertStockEntry(stock.code, (e)=>{ const p = e.personas.find(x=>x.id===persona.id); if(p) p.name = name; return e; });
+      renderDetail(stock);
+    }
+    function removePersona(stock, persona){
+      if(!confirm('정말 삭제할까요? 이 페르소나의 모든 매수 기록이 지워집니다.')) return;
+      upsertStockEntry(stock.code, (e)=>{ e.personas = e.personas.filter(x=>x.id!==persona.id); return e; });
+      renderDetail(stock);
+    }
+
+    // ====== 다이얼로그: 매수 추가/수정 ======
+    const buyDialog = document.getElementById('buyDialog');
+    const buyForm = document.getElementById('buyForm');
+    const buyDate = document.getElementById('buyDate');
+    const buyPrice = document.getElementById('buyPrice');
+    const buyQty = document.getElementById('buyQty');
+    const targetPrice = document.getElementById('targetPrice');
+    const ruleHint = document.getElementById('ruleHint');
+    const buyTotal = document.getElementById('buyTotal');
+    const buyDialogTitle = document.getElementById('buyDialogTitle');
+    const buySave = document.getElementById('buySave');
+    const buyCancel = document.getElementById('buyCancel');
+
+    let buyCtx = null; // { mode: 'add'|'edit', stock, persona, order?, preset? }
+    let targetTouched = false;
+
+    function openBuyDialog(mode, stock, persona, order, preset){
+      buyCtx = { mode, stock, persona, order, preset };
+      buyDialogTitle.textContent = mode==='add' ? '매수 주문 추가' : '매수 주문 수정';
+      buySave.textContent = mode==='add' ? '추가' : '저장';
+
+      const live = getLivePrice(stock.code);
+      const basePrice = preset?.price ?? order?.price ?? Math.round(live);
+      const baseQty = preset?.qty ?? order?.qty ?? 10;
+      const baseTarget = preset?.target ?? order?.target ?? suggSell(basePrice);
+
+      buyDate.value = order?.date || todayStr();
+      buyPrice.value = basePrice;
+      buyQty.value = baseQty;
+      targetPrice.value = baseTarget;
+      ruleHint.textContent = `룰 제안: 매도목표가 = 매수가 × 1.031 → ${fmtWon(suggSell(Number(buyPrice.value||0)))}`;
+      targetTouched = false;
+      updateBuyTotal();
+      buyDialog.showModal();
+    }
+
+    targetPrice.addEventListener('input', ()=> targetTouched = true);
+    [buyPrice, buyQty].forEach(i=> i.addEventListener('input', updateBuyTotal));
+    function updateBuyTotal(){
+      const t = (Number(buyPrice.value||0) * Number(buyQty.value||0));
+      buyTotal.value = fmtWon(t);
+      if(!targetTouched){ targetPrice.value = suggSell(Number(buyPrice.value||0)); }
+      ruleHint.textContent = `룰 제안: 매도목표가 = 매수가 × 1.031 → ${fmtWon(suggSell(Number(buyPrice.value||0)))}`;
+    }
+    buyCancel.addEventListener('click', ()=> buyDialog.close());
+
+    buyForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const payload = {
+        date: buyDate.value,
+        price: Math.round(Number(buyPrice.value||0)),
+        qty: Math.round(Number(buyQty.value||0)),
+        target: targetPrice.value ? Math.round(Number(targetPrice.value)) : null,
+      };
+      if(!payload.date || !payload.price || !payload.qty){ alert('필수 값을 확인하세요.'); return; }
+
+      if(buyCtx.mode==='add'){
+        upsertStockEntry(buyCtx.stock.code, (entry)=>{
+          const p = entry.personas.find(x=>x.id===buyCtx.persona.id);
+          if(p){ p.orders.push({ id: crypto.randomUUID(), status: 'OPEN', ...payload }); }
+          return entry;
+        });
+      } else {
+        upsertStockEntry(buyCtx.stock.code, (entry)=>{
+          const p = entry.personas.find(x=>x.id===buyCtx.persona.id);
+          const o = p?.orders.find(x=>x.id===buyCtx.order.id);
+          if(o){ Object.assign(o, payload); }
+          return entry;
+        });
+      }
+      buyDialog.close();
+      renderDetail(buyCtx.stock);
+    });
+
+    // ====== 다이얼로그: 매도 ======
+    const sellDialog = document.getElementById('sellDialog');
+    const sellForm = document.getElementById('sellForm');
+    const sellDate = document.getElementById('sellDate');
+    const sellPrice = document.getElementById('sellPrice');
+    const sellHint = document.getElementById('sellHint');
+    const sellCancel = document.getElementById('sellCancel');
+
+    let sellCtx = null; // { stock, persona, order }
+
+    function openSellDialog(stock, persona, order){
+      sellCtx = { stock, persona, order };
+      const live = getLivePrice(stock.code);
+      const ruleTarget = (order.target || suggSell(order.price));
+      sellDate.value = todayStr();
+      sellPrice.value = Math.round(live);
+      sellHint.innerHTML = `현재가 <b>${fmtWon(live)}</b> • 룰 목표가 <b>${fmtWon(ruleTarget)}</b> • 보유수량 <b>${order.qty}</b>주`;
+      sellDialog.showModal();
+    }
+
+    sellCancel.addEventListener('click', ()=> sellDialog.close());
+
+    sellForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const price = Math.round(Number(sellPrice.value||0));
+      const date = sellDate.value;
+      if(!price || !date){ alert('매도 정보를 확인하세요.'); return; }
+      upsertStockEntry(sellCtx.stock.code, (entry)=>{
+        const p = entry.personas.find(x=>x.id===sellCtx.persona.id);
+        const o = p?.orders.find(x=>x.id===sellCtx.order.id);
+        if(o && o.status!=='CLOSED'){
+          o.status = 'CLOSED';
+          o.sellPrice = price;
+          o.sellDate = date;
+          o.realized = (price - o.price) * o.qty;
+        }
+        return entry;
+      });
+      sellDialog.close();
+      renderDetail(sellCtx.stock);
+    });
+
+    // ====== 라이브 가격 조회 헬퍼 ======
+    function getLivePrice(code){ const s = state.stocks.find(x=>x.code===code); return s?.price ?? 0; }
+
+    // ====== 초기화 ======
+    document.getElementById('backBtn').addEventListener('click', (e)=>{ if(location.hash.startsWith('#stock/')){ e.preventDefault(); location.hash = ''; } });
+
+    startAutoRefresh();
+    syncFromHash();
+  </script>
+</body>
+</html>
