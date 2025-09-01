@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>페르소나 투자</title>
+  <title>페르소나 투자 웹앱</title>
   <style>
     :root {
       --bg: #0b1020;
@@ -95,6 +95,8 @@
     @keyframes pulse { 0%{ transform: scale(1);} 50%{ transform: scale(1.04);} 100%{ transform: scale(1);} }
     .pulse { animation: pulse 1.1s infinite; }
 
+    .warn { margin: 10px 0; padding: 10px 12px; border-radius: 12px; border:1px solid rgba(255,176,32,.35); background: rgba(255,176,32,.08); color: #ffd89a; }
+
     @media (max-width: 720px){
       .stock-item{ grid-template-columns: 1fr 110px 90px; }
       .grid-2 { grid-template-columns: 1fr; }
@@ -109,7 +111,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>보유종목으로 돌아가기</span>
       </a>
-      <h1 id="title" style="margin-left:auto">페르소나 투자</h1>
+      <h1 id="title" style="margin-left:auto">페르소나 투자 웹앱</h1>
     </div>
   </header>
 
@@ -186,7 +188,6 @@
     const suggRebuy = (sellPrice) => roundDownTo(sellPrice * (1 - RULE.dn), RULE.round);
 
     function parseCSV(text){
-      // 기대 형식: 종목명,종목코드,가격
       const lines = text.trim().split(/
 ?
 /);
@@ -206,33 +207,37 @@
 
     // ====== 로컬 스토리지 미니 DB ======
     const dbKey = 'persona-trader.v1';
-    function loadDB(){
-      try{ return JSON.parse(localStorage.getItem(dbKey)) || { stocks:{} }; }catch{ return { stocks:{} }; }
-    }
+    function loadDB(){ try{ return JSON.parse(localStorage.getItem(dbKey)) || { stocks:{} }; }catch{ return { stocks:{} }; } }
     function saveDB(data){ localStorage.setItem(dbKey, JSON.stringify(data)); }
 
-    // stock 구조: { personas: [ { id, name, orders: [ { id, date, price, qty, target, status: 'OPEN'|'CLOSED', sellDate?, sellPrice?, realized? } ] } ] }
-    function getStockEntry(code){
-      const db = loadDB();
-      if(!db.stocks[code]){ db.stocks[code] = { personas: [] }; saveDB(db); }
-      return db.stocks[code];
-    }
-    function upsertStockEntry(code, updater){
-      const db = loadDB();
-      const entry = db.stocks[code] || { personas: [] };
-      db.stocks[code] = updater(entry) || entry;
-      saveDB(db);
-    }
+    function getStockEntry(code){ const db = loadDB(); if(!db.stocks[code]){ db.stocks[code] = { personas: [] }; saveDB(db); } return db.stocks[code]; }
+    function upsertStockEntry(code, updater){ const db = loadDB(); const entry = db.stocks[code] || { personas: [] }; db.stocks[code] = updater(entry) || entry; saveDB(db); }
 
     // ====== 상태 ======
-    let state = { stocks: [], selected: null };
+    let state = { stocks: [], selected: null, usingProxy: false, lastError: null };
+
+    async function fetchTextWithFallback(url){
+      state.usingProxy = false; state.lastError = null;
+      try{
+        const res = await fetch(url, { cache: 'no-store' });
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.text();
+      }catch(err){
+        // CORS 회피 프록시 (읽기 전용, 개인용 임시)
+        try{
+          const proxied = 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//, '');
+          const res2 = await fetch(proxied, { cache: 'no-store' });
+          if(!res2.ok) throw new Error(`Proxy HTTP ${res2.status}`);
+          state.usingProxy = true; return await res2.text();
+        }catch(err2){ state.lastError = String(err2?.message||err?.message||'Unknown'); throw err2; }
+      }
+    }
 
     async function fetchStocks(){
       try{
-        const res = await fetch(CSV_URL, { cache: 'no-store' });
-        const text = await res.text();
+        const text = await fetchTextWithFallback(CSV_URL);
         state.stocks = parseCSV(text);
-      }catch(err){ console.error('가격 불러오기 실패', err); }
+      }catch(err){ console.error('가격 불러오기 실패', err); state.stocks = []; }
       render();
     }
 
@@ -255,7 +260,7 @@
     const backBtn = document.getElementById('backBtn');
 
     function render(){
-      if(!state.selected){ renderList(); backBtn.style.visibility='hidden'; $('#title').textContent = '페르소나 투자'; return; }
+      if(!state.selected){ renderList(); backBtn.style.visibility='hidden'; $('#title').textContent = '페르소나 투자 웹앱'; return; }
       backBtn.style.visibility='visible'; renderDetail(state.selected);
     }
 
@@ -271,11 +276,22 @@
           </div>
           <button class="btn ghost" id="refreshBtn">새로고침</button>
         </div>
+        ${state.usingProxy ? `<div class="warn">CSV CORS 문제로 임시 프록시를 사용 중입니다. 개인용으로만 이용하세요.</div>`: ''}
+        ${state.lastError ? `<div class="warn">데이터를 불러오지 못했습니다: ${state.lastError}</div>`: ''}
         <div class="list" id="stockList"></div>
       `;
       app.appendChild(box);
 
       const list = $('#stockList', box);
+
+      if(state.stocks.length===0){
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.style.padding = '8px 2px';
+        empty.innerHTML = '표시할 종목이 없습니다. Google Sheets가 <b>웹에 게시</b>되어 있는지와 URL을 확인하세요.';
+        list.appendChild(empty);
+      }
+
       for(const s of state.stocks){
         const item = document.createElement('div');
         item.className = 'stock-item';
@@ -343,7 +359,6 @@
       const evalPL = evalAmt - invested;
       const realized = persona.orders.filter(o=>o.status==='CLOSED').reduce((a,o)=>a + (o.realized||0), 0);
 
-      // 룰 체크: 매도(열린 주문들), 재매수(마지막 매도)
       const sellTriggers = openOrders.map(o=>({ oid:o.id, target:(o.target||suggSell(o.price)), hit: live >= (o.target||suggSell(o.price)) }));
       const lastClosed = [...persona.orders].filter(o=>o.status==='CLOSED').slice(-1)[0];
       const rebuyTarget = lastClosed ? suggRebuy(lastClosed.sellPrice) : null;
@@ -432,11 +447,7 @@
         }
         if(act==='quickRebuy' && lastClosed){
           const defQty = lastClosed.qty || 1;
-          openBuyDialog('add', stock, persona, null, {
-            price: Math.round(live),
-            qty: defQty,
-            target: suggSell(Math.round(live))
-          });
+          openBuyDialog('add', stock, persona, null, { price: Math.round(live), qty: defQty, target: suggSell(Math.round(live)) });
         }
       });
 
@@ -503,27 +514,13 @@
 
     buyForm.addEventListener('submit', (e)=>{
       e.preventDefault();
-      const payload = {
-        date: buyDate.value,
-        price: Math.round(Number(buyPrice.value||0)),
-        qty: Math.round(Number(buyQty.value||0)),
-        target: targetPrice.value ? Math.round(Number(targetPrice.value)) : null,
-      };
+      const payload = { date: buyDate.value, price: Math.round(Number(buyPrice.value||0)), qty: Math.round(Number(buyQty.value||0)), target: targetPrice.value ? Math.round(Number(targetPrice.value)) : null };
       if(!payload.date || !payload.price || !payload.qty){ alert('필수 값을 확인하세요.'); return; }
 
       if(buyCtx.mode==='add'){
-        upsertStockEntry(buyCtx.stock.code, (entry)=>{
-          const p = entry.personas.find(x=>x.id===buyCtx.persona.id);
-          if(p){ p.orders.push({ id: crypto.randomUUID(), status: 'OPEN', ...payload }); }
-          return entry;
-        });
+        upsertStockEntry(buyCtx.stock.code, (entry)=>{ const p = entry.personas.find(x=>x.id===buyCtx.persona.id); if(p){ p.orders.push({ id: crypto.randomUUID(), status: 'OPEN', ...payload }); } return entry; });
       } else {
-        upsertStockEntry(buyCtx.stock.code, (entry)=>{
-          const p = entry.personas.find(x=>x.id===buyCtx.persona.id);
-          const o = p?.orders.find(x=>x.id===buyCtx.order.id);
-          if(o){ Object.assign(o, payload); }
-          return entry;
-        });
+        upsertStockEntry(buyCtx.stock.code, (entry)=>{ const p = entry.personas.find(x=>x.id===buyCtx.persona.id); const o = p?.orders.find(x=>x.id===buyCtx.order.id); if(o){ Object.assign(o, payload); } return entry; });
       }
       buyDialog.close();
       renderDetail(buyCtx.stock);
@@ -560,10 +557,7 @@
         const p = entry.personas.find(x=>x.id===sellCtx.persona.id);
         const o = p?.orders.find(x=>x.id===sellCtx.order.id);
         if(o && o.status!=='CLOSED'){
-          o.status = 'CLOSED';
-          o.sellPrice = price;
-          o.sellDate = date;
-          o.realized = (price - o.price) * o.qty;
+          o.status = 'CLOSED'; o.sellPrice = price; o.sellDate = date; o.realized = (price - o.price) * o.qty;
         }
         return entry;
       });
