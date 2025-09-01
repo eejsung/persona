@@ -188,6 +188,7 @@
     const suggRebuy = (sellPrice) => roundDownTo(sellPrice * (1 - RULE.dn), RULE.round);
 
     function parseCSV(text){
+      // 기대 형식: 종목명,종목코드,가격
       const lines = text.trim().split(/
 ?
 /);
@@ -200,6 +201,10 @@
           const price = Number(String(parts[2]).replace(/[^0-9.\-]/g,'')) || 0;
           rows.push({ name, code, price });
         }
+      }
+      if(rows.length && rows[0].name === '종목명'){ rows.shift(); }
+      return rows;
+    }
       }
       if(rows.length && rows[0].name === '종목명'){ rows.shift(); }
       return rows;
