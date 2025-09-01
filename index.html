@@ -109,7 +109,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>보유종목으로 돌아가기</span>
       </a>
-      <h1 id="title" style="margin-left:auto">페르소나 투자 웹앱</h1>
+      <h1 id="title" style="margin-left:auto">페르소나 투자</h1>
     </div>
   </header>
 
@@ -187,7 +187,8 @@
 
     function parseCSV(text){
       // 기대 형식: 종목명,종목코드,가격
-      const lines = text.trim().split(/?
+      const lines = text.trim().split(/
+?
 /);
       const rows = [];
       for(const line of lines){
