@@ -95,8 +95,6 @@
     @keyframes pulse { 0%{ transform: scale(1);} 50%{ transform: scale(1.04);} 100%{ transform: scale(1);} }
     .pulse { animation: pulse 1.1s infinite; }
 
-    .warn { margin: 10px 0; padding: 10px 12px; border-radius: 12px; border:1px solid rgba(255,176,32,.35); background: rgba(255,176,32,.08); color: #ffd89a; }
-
     @media (max-width: 720px){
       .stock-item{ grid-template-columns: 1fr 110px 90px; }
       .grid-2 { grid-template-columns: 1fr; }
@@ -182,29 +180,38 @@
     const todayStr = () => new Date().toISOString().slice(0,10);
     const fmtWon = (n) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 }).format(Math.round(n||0));
 
-    const roundUpTo = (n, step) => Math.ceil((n||0)/step)*step;
-    const roundDownTo = (n, step) => Math.floor((n||0)/step)*step;
-    const suggSell = (buyPrice) => roundUpTo(buyPrice * (1 + RULE.up), RULE.round);
-    const suggRebuy = (sellPrice) => roundDownTo(sellPrice * (1 - RULE.dn), RULE.round);
+    // 정규식 없는 숫자 정리 & 줄바꿈 파서
+    const cleanNum = (s) => {
+      const str = String(s||'');
+      let out = '';
+      for(let i=0;i<str.length;i++){
+        const ch = str[i];
+        if((ch>='0'&&ch<='9')||ch==='.'||ch==='-') out += ch;
+      }
+      return out;
+    };
+    const splitLines = (text) => {
+      const arr = String(text||'').split('
+');
+      for(let i=0;i<arr.length;i++){
+        if(arr[i].endsWith('
+')) arr[i] = arr[i].slice(0,-1);
+      }
+      return arr;
+    };
 
     function parseCSV(text){
       // 기대 형식: 종목명,종목코드,가격
-      const lines = text.trim().split(/
-?
-/);
+      const lines = splitLines(text.trim());
       const rows = [];
       for(const line of lines){
-        const parts = line.split(',').map(s=>s.trim());
+        const parts = line.split(',');
         if(parts.length >= 3){
-          const name = parts[0];
-          const code = parts[1];
-          const price = Number(String(parts[2]).replace(/[^0-9.\-]/g,'')) || 0;
+          const name = (parts[0]||'').trim();
+          const code = (parts[1]||'').trim();
+          const price = Number(cleanNum(parts[2])) || 0;
           rows.push({ name, code, price });
         }
-      }
-      if(rows.length && rows[0].name === '종목명'){ rows.shift(); }
-      return rows;
-    }
       }
       if(rows.length && rows[0].name === '종목명'){ rows.shift(); }
       return rows;
@@ -212,50 +219,49 @@
 
     // ====== 로컬 스토리지 미니 DB ======
     const dbKey = 'persona-trader.v1';
-    function loadDB(){ try{ return JSON.parse(localStorage.getItem(dbKey)) || { stocks:{} }; }catch{ return { stocks:{} }; } }
+    function loadDB(){
+      try{ return JSON.parse(localStorage.getItem(dbKey)) || { stocks:{} }; }catch{ return { stocks:{} }; }
+    }
     function saveDB(data){ localStorage.setItem(dbKey, JSON.stringify(data)); }
 
-    function getStockEntry(code){ const db = loadDB(); if(!db.stocks[code]){ db.stocks[code] = { personas: [] }; saveDB(db); } return db.stocks[code]; }
-    function upsertStockEntry(code, updater){ const db = loadDB(); const entry = db.stocks[code] || { personas: [] }; db.stocks[code] = updater(entry) || entry; saveDB(db); }
+    // stock 구조: { personas: [ { id, name, orders: [ { id, date, price, qty, target, status: 'OPEN'|'CLOSED', sellDate?, sellPrice?, realized? } ] } ] }
+    function getStockEntry(code){
+      const db = loadDB();
+      if(!db.stocks[code]){ db.stocks[code] = { personas: [] }; saveDB(db); }
+      return db.stocks[code];
+    }
+    function upsertStockEntry(code, updater){
+      const db = loadDB();
+      const entry = db.stocks[code] || { personas: [] };
+      db.stocks[code] = updater(entry) || entry;
+      saveDB(db);
+    }
 
     // ====== 상태 ======
-    let state = { stocks: [], selected: null, usingProxy: false, lastError: null };
-
-    async function fetchTextWithFallback(url){
-      state.usingProxy = false; state.lastError = null;
-      try{
-        const res = await fetch(url, { cache: 'no-store' });
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.text();
-      }catch(err){
-        // CORS 회피 프록시 (읽기 전용, 개인용 임시)
-        try{
-          const proxied = 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//, '');
-          const res2 = await fetch(proxied, { cache: 'no-store' });
-          if(!res2.ok) throw new Error(`Proxy HTTP ${res2.status}`);
-          state.usingProxy = true; return await res2.text();
-        }catch(err2){ state.lastError = String(err2?.message||err?.message||'Unknown'); throw err2; }
-      }
-    }
+    let state = { stocks: [], selected: null };
 
     async function fetchStocks(){
       try{
-        const text = await fetchTextWithFallback(CSV_URL);
+        const res = await fetch(CSV_URL, { cache: 'no-store' });
+        const text = await res.text();
         state.stocks = parseCSV(text);
-      }catch(err){ console.error('가격 불러오기 실패', err); state.stocks = []; }
+      }catch(err){ console.error('가격 불러오기 실패', err); }
       render();
     }
 
     function startAutoRefresh(){ fetchStocks(); setInterval(fetchStocks, REFRESH_MS); }
 
-    // ====== 라우팅 ======
+    // ====== 라우팅(정규식 없이) ======
     function syncFromHash(){
-      const m = location.hash.match(/#stock\/(.+)$/);
-      if(m){
-        const code = decodeURIComponent(m[1]);
+      const h = location.hash || '';
+      const pref = '#stock/';
+      if(h.startsWith(pref)){
+        const code = decodeURIComponent(h.slice(pref.length));
         const found = state.stocks.find(s=>s.code===code);
-        if(found){ state.selected = found; } else { state.selected = { name:'', code, price: 0 }; }
-      } else { state.selected = null; }
+        state.selected = found ? found : { name:'', code, price: 0 };
+      } else {
+        state.selected = null;
+      }
       render();
     }
     window.addEventListener('hashchange', syncFromHash);
@@ -281,22 +287,11 @@
           </div>
           <button class="btn ghost" id="refreshBtn">새로고침</button>
         </div>
-        ${state.usingProxy ? `<div class="warn">CSV CORS 문제로 임시 프록시를 사용 중입니다. 개인용으로만 이용하세요.</div>`: ''}
-        ${state.lastError ? `<div class="warn">데이터를 불러오지 못했습니다: ${state.lastError}</div>`: ''}
         <div class="list" id="stockList"></div>
       `;
       app.appendChild(box);
 
       const list = $('#stockList', box);
-
-      if(state.stocks.length===0){
-        const empty = document.createElement('div');
-        empty.className = 'muted';
-        empty.style.padding = '8px 2px';
-        empty.innerHTML = '표시할 종목이 없습니다. Google Sheets가 <b>웹에 게시</b>되어 있는지와 URL을 확인하세요.';
-        list.appendChild(empty);
-      }
-
       for(const s of state.stocks){
         const item = document.createElement('div');
         item.className = 'stock-item';
@@ -351,6 +346,11 @@
         renderDetail(stock);
       });
     }
+
+    const roundUpTo = (n, step) => Math.ceil((n||0)/step)*step;
+    const roundDownTo = (n, step) => Math.floor((n||0)/step)*step;
+    const suggSell = (buyPrice) => roundUpTo(buyPrice * (1 + RULE.up), RULE.round);
+    const suggRebuy = (sellPrice) => roundDownTo(sellPrice * (1 - RULE.dn), RULE.round);
 
     function renderPersonaCard(stock, persona, index){
       const live = getLivePrice(stock.code);
@@ -493,11 +493,11 @@
       buySave.textContent = mode==='add' ? '추가' : '저장';
 
       const live = getLivePrice(stock.code);
-      const basePrice = preset?.price ?? order?.price ?? Math.round(live);
-      const baseQty = preset?.qty ?? order?.qty ?? 10;
-      const baseTarget = preset?.target ?? order?.target ?? suggSell(basePrice);
+      const basePrice = (preset && preset.price != null) ? preset.price : (order && order.price != null ? order.price : Math.round(live));
+      const baseQty = (preset && preset.qty != null) ? preset.qty : (order && order.qty != null ? order.qty : 10);
+      const baseTarget = (preset && preset.target != null) ? preset.target : (order && order.target != null ? order.target : suggSell(basePrice));
 
-      buyDate.value = order?.date || todayStr();
+      buyDate.value = (order && order.date) || todayStr();
       buyPrice.value = basePrice;
       buyQty.value = baseQty;
       targetPrice.value = baseTarget;
@@ -525,7 +525,7 @@
       if(buyCtx.mode==='add'){
         upsertStockEntry(buyCtx.stock.code, (entry)=>{ const p = entry.personas.find(x=>x.id===buyCtx.persona.id); if(p){ p.orders.push({ id: crypto.randomUUID(), status: 'OPEN', ...payload }); } return entry; });
       } else {
-        upsertStockEntry(buyCtx.stock.code, (entry)=>{ const p = entry.personas.find(x=>x.id===buyCtx.persona.id); const o = p?.orders.find(x=>x.id===buyCtx.order.id); if(o){ Object.assign(o, payload); } return entry; });
+        upsertStockEntry(buyCtx.stock.code, (entry)=>{ const p = entry.personas.find(x=>x.id===buyCtx.persona.id); const o = p && p.orders.find(x=>x.id===buyCtx.order.id); if(o){ Object.assign(o, payload); } return entry; });
       }
       buyDialog.close();
       renderDetail(buyCtx.stock);
@@ -560,9 +560,12 @@
       if(!price || !date){ alert('매도 정보를 확인하세요.'); return; }
       upsertStockEntry(sellCtx.stock.code, (entry)=>{
         const p = entry.personas.find(x=>x.id===sellCtx.persona.id);
-        const o = p?.orders.find(x=>x.id===sellCtx.order.id);
+        const o = p && p.orders.find(x=>x.id===sellCtx.order.id);
         if(o && o.status!=='CLOSED'){
-          o.status = 'CLOSED'; o.sellPrice = price; o.sellDate = date; o.realized = (price - o.price) * o.qty;
+          o.status = 'CLOSED';
+          o.sellPrice = price;
+          o.sellDate = date;
+          o.realized = (price - o.price) * o.qty;
         }
         return entry;
       });
@@ -571,10 +574,10 @@
     });
 
     // ====== 라이브 가격 조회 헬퍼 ======
-    function getLivePrice(code){ const s = state.stocks.find(x=>x.code===code); return s?.price ?? 0; }
+    function getLivePrice(code){ const s = state.stocks.find(x=>x.code===code); return s && s.price ? s.price : 0; }
 
     // ====== 초기화 ======
-    document.getElementById('backBtn').addEventListener('click', (e)=>{ if(location.hash.startsWith('#stock/')){ e.preventDefault(); location.hash = ''; } });
+    document.getElementById('backBtn').addEventListener('click', (e)=>{ if(location.hash.indexOf('#stock/')===0){ e.preventDefault(); location.hash = ''; } });
 
     startAutoRefresh();
     syncFromHash();
